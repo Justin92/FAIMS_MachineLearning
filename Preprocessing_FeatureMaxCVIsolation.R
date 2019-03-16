@@ -110,9 +110,50 @@ ggplot(AllFeaturesMaxCV, aes(Peak_CV, colour = Charge)) + geom_histogram(binwidt
 
 #Reads in, isolates and makes density plots showing the error between the model and 
 FeatureswError <- read.csv("FeaturesMaxCV_withErr.csv")
-AllChargeby9 <- FeatureswError[grep("30|40|50|60|70|80|90|110|100", FeatureswError$y2), ]
-ggplot(AllChargeby9, aes(x=Signd_Model_Error, group = Charge, fill = factor(Charge))) + geom_density(alpha = 0.4) + 
-  facet_wrap(~y2, ncol = 3, nrow = 3)
+AllChargeby9<- FeatureswError[grep("30|40|50|60|70|80|90|110|100", FeatureswError$y2), ]
+
+ggplot(AllChargeby9_2, aes(x=Signd_Model_Error, group = Charge, fill = factor(Charge))) + geom_density(alpha = 0.4) + 
+  facet_wrap(~y2, ncol = 3, nrow = 3) + theme_gray()
+
+
+#Lets make function that takes in the table with error and attaches
+#a vector to it describing number of points across chrom peak
+
+
+for(i in 1:nrow(FeatureswError)){
+  
+  FeatureswError$No_Points[i] = nrow(filter(workingEvidence, Sequence == FeatureswError$Sequence[i], 
+                                            Charge == FeatureswError$Charge[i], 
+                                            myCV == FeatureswError$Experiment[i]))
+}
+
+for(i in 1:nrow(FeatureswError)){
+  
+  FeatureswError$TotalObs[i] = nrow(filter(workingEvidence, Sequence == FeatureswError$Sequence[i], 
+                                            Charge == FeatureswError$Charge[i]))
+}
+
+
+FeatureswError <- FeatureswError[order(FeatureswError$model_error), ]
+FeatureswError$Abs_Error_Quartile <- c(rep("Q1", 8243), rep("Q2",8243), rep("Q3",8243), rep("Q4",8242))
+
+write.csv(FeatureswError, "AllFeatureswErrorObsNumbers.csv", row.names = F)
+
+
+
+
+> ggplot(BadHigh, aes(factor(Experiment), Intensity, color = Retention.time)) + geom_boxplot() + theme_grey()
+> BadHigh <- BadHigh %>% mutate(LogIntensity = log(Intensity, 2))
+> ggplot(BadHigh, aes(factor(Experiment), LogIntensity)) + geom_boxplot() + theme_grey()
+> GoodHigh <-workingEvidence %>% filter(Sequence == "EHALLAYTLGVK", Charge == 3) %>% select(Sequence, Experiment, Retention.time, Intensity, Charge)
+> GoodHigh <- GoodHigh %>% mutate(LogIntensity = log(Intensity, 2))
+> ggplot(GoodHigh, aes(Experiment, Intensity, color = Retention.time)) + geom_point(alpha = 0.4) + theme_grey()
+> ggplot(GoodHigh, aes(Experiment, Intensity)) + geom_boxplot() + theme_grey()
+> GoodHigh$Experiment <- as.numeric(gsub("^CV_|_2$", "", GoodHigh$Experiment))
+> ggplot(GoodHigh, aes(Experiment, Intensity, color = Retention.time)) + geom_point(alpha = 0.4) + theme_grey()
+> ggplot(GoodHigh, aes(factor(Experiment), LogIntensity)) + geom_boxplot() + theme_grey()
+
+
 
 
 
