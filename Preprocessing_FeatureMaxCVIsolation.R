@@ -1,5 +1,4 @@
 
-
 ##Code used to thin out the evidence file and find max CVs
 ##Could be made more efficient possibly by using the peptides file
 library(dplyr)
@@ -12,21 +11,117 @@ myEvidence <- read.delim("C:/Users/jmcketney.AD/Desktop/FAIMS_MachineLearning/ev
 myPeptides <- read.delim("C:/Users/jmcketney.AD/Desktop/FAIMS_MachineLearning/peptides.txt")
 
 
-##Get rid of half of experiments so they can be used for validation, and remove modified and bad scoring peptides
+##Get rid of half of experiments so they can be used for validation
 #myEvidenceHalved <- myEvidence[-(grep("_2$", myEvidence$Raw.file)), ]
+
+#Remove modified, bad scoring peptides and those with missing values
 workingEvidence <- myEvidence %>% filter(Modifications == "Unmodified", MS.MS.IDs != "-1") %>% filter(is.na(Intensity) == FALSE)
 
-##Remove missing values then find max intensity experiment for each Sequence charge combination
-maxCVs <- workingEvidence %>% group_by(Sequence, Charge) %>% summarise(myMaxCV = max(Intensity))
+##find max intensity experiment for each Sequence charge combination
+maxCVs <- workingEvidence %>% group_by(Sequence, Charge) %>% summarise(myMaxIntensity = max(Intensity))
 names(maxCVs) <- c(names(maxCVs[1:2]), "Intensity")
 
 
 ##merge Max CVs with other data to get raw file and amino acid counts
 AllFeaturesMaxCV <- merge(maxCVs, workingEvidence, by = c("Sequence", "Charge", "Intensity"))
+
+
+
+###############################################
+####Filter peptides with limited points####
+
+#Add Total Observation row to Feature list
+AllFeaturesMaxCV$Total_Observations = 0
+
+#Iterate through and count total observations
+
+#Add CV_Setting column to both evidence and features dataframe
+AllFeaturesMaxCV <- AllFeaturesMaxCV %>% mutate(CV_Setting = gsub("CV_|_2", "", Experiment))
+workingEvidence <- workingEvidence %>% mutate(CV_Setting = gsub("CV_|_2", "", Experiment))
+
+#Make data frame with CV experiment observation counts for each peptide/charge combo and give it the same number
+#of rows as the feature table
+
+###############################################
+####    MAKING OBSERVATION COUNT LAYER  ####
+numRows <- nrow(AllFeaturesMaxCV)
+Ion_Observations <- data.frame(Sequence=c(rep(NA, numRows)), Charge=c(rep(NA, numRows)), CV_15 = c(rep(NA, numRows)),
+                               CV_20=c(rep(NA, numRows)), CV_25=c(rep(NA, numRows)), CV_30=c(rep(NA, numRows)),
+                               CV_35=c(rep(NA, numRows)), CV_40=c(rep(NA, numRows)), CV_45=c(rep(NA, numRows)),
+                               CV_50=c(rep(NA, numRows)), CV_55=c(rep(NA, numRows)), CV_60=c(rep(NA, numRows)),
+                               CV_65=c(rep(NA, numRows)), CV_70=c(rep(NA, numRows)), CV_75=c(rep(NA, numRows)),
+                               CV_80=c(rep(NA, numRows)), CV_85=c(rep(NA, numRows)), CV_90=c(rep(NA, numRows)),
+                               CV_95=c(rep(NA, numRows)), CV_100=c(rep(NA, numRows)), CV_105=c(rep(NA, numRows)), 
+                               CV_110=c(rep(NA, numRows)), CV_115=c(rep(NA, numRows)), CV_120=c(rep(NA, numRows)))
+
+for(i in 1:nrow(AllFeaturesMaxCV)){
+  #Extracts peptide charge combo
+  MySequence <- AllFeaturesMaxCV$Sequence[i]
+  myCharge <- AllFeaturesMaxCV$Charge[i]
+  
+  #Uses to subset working evidence data frame
+  workingFrame <-filter(workingEvidence, Sequence == AllFeaturesMaxCV$Sequence[i], 
+                                           Charge == AllFeaturesMaxCV$Charge[i])
+  #makes working ion observation row
+  Ion_Observations$Sequence[i] <- as.character(MySequence)
+  Ion_Observations$Charge[i] <- myCharge
+  for(j in 3:ncol(Ion_Observations)){
+    Ion_Observations[i, j] <- length(grep(names(Ion_Observations[j]), workingFrame$Experiment))
+  }
+}
+
+
+for(i in 1:nrow(AllFeaturesMaxCV)){
+  
+  AllFeaturesMaxCV$Total_Observations[i] <- nrow(filter(workingEvidence, Sequence == AllFeaturesMaxCV$Sequence[i],
+                                                        Charge == AllFeaturesMaxCV$Charge[i]))
+}
+
+###############################################
+####    MAKING MEAN INTENSITY LAYER     ####
+#Make data frame with CV experiment mean intensities for each peptide/charge combo and give it the same number
+#of rows as the feature table
+Mean_Intensity <- data.frame(Sequence=c(rep(NA, numRows)), Charge=c(rep(NA, numRows)), CV_15 = c(rep(NA, numRows)),
+                               CV_20=c(rep(NA, numRows)), CV_25=c(rep(NA, numRows)), CV_30=c(rep(NA, numRows)),
+                               CV_35=c(rep(NA, numRows)), CV_40=c(rep(NA, numRows)), CV_45=c(rep(NA, numRows)),
+                               CV_50=c(rep(NA, numRows)), CV_55=c(rep(NA, numRows)), CV_60=c(rep(NA, numRows)),
+                               CV_65=c(rep(NA, numRows)), CV_70=c(rep(NA, numRows)), CV_75=c(rep(NA, numRows)),
+                               CV_80=c(rep(NA, numRows)), CV_85=c(rep(NA, numRows)), CV_90=c(rep(NA, numRows)),
+                               CV_95=c(rep(NA, numRows)), CV_100=c(rep(NA, numRows)), CV_105=c(rep(NA, numRows)), 
+                               CV_110=c(rep(NA, numRows)), CV_115=c(rep(NA, numRows)), CV_120=c(rep(NA, numRows)))
+#Iterating through the features table and calculating the mean at each 
+for(i in 1:nrow(AllFeaturesMaxCV)){
+  #Extracts peptide charge combo
+  MySequence <- AllFeaturesMaxCV$Sequence[i]
+  myCharge <- AllFeaturesMaxCV$Charge[i]
+  
+  #Uses to subset working evidence data frame
+  workingFrame <-workingEvidence%>% filter(Sequence == AllFeaturesMaxCV$Sequence[i], 
+                        Charge == AllFeaturesMaxCV$Charge[i]) %>% select(Intensity, Experiment)
+  #makes working ion observation row
+  Mean_Intensity$Sequence[i] <- as.character(MySequence)
+  Mean_Intensity$Charge[i] <- myCharge
+  for(j in 3:ncol(Mean_Intensity)){
+    Mean_Intensity[i, j] <- mean(workingFrame$Intensity[grep(names(Ion_Observations[j]), workingFrame$Experiment)])
+  }
+}
+
+###############################################
+###     CLEANING UP THE FEATURES TABLE     ####
+
+#Select the Sequence, Intensity, Charge, Length and Raw file(as a stand in for max CV)
 AllFeaturesMaxCV <- select(AllFeaturesMaxCV, Sequence:Length, Raw.file)
+
+#Get rid of all infor besides CV for the raw file
 AllFeaturesMaxCV$Raw.file <- gsub(".*_CV_", "", AllFeaturesMaxCV$Raw.file)
+
+#Make raw file (now basically CV) a factor
 AllFeaturesMaxCV$Raw.file <- factor(AllFeaturesMaxCV$Raw.file)
+
+#Merge our peptides with the amino acid count information from the peptide.txt file
 AllFeaturesMaxCV <- merge(AllFeaturesMaxCV, myPeptides[, 1:36], by = "Sequence")
+
+#Select columns pulled from evidence(charge, sequence, etc) along with amino acid counts from peptide file
 AllFeaturesMaxCV <- select(AllFeaturesMaxCV, Sequence:Raw.file, A.Count:O.Count)
 
 ##Change names and write file containing max intensity CV, Charge, Sequence, AA counts and Length to a csv
@@ -34,9 +129,38 @@ AllFeaturesMaxCV$Raw.file <- gsub("_2$", "", AllFeaturesMaxCV$Raw.file)
 names(AllFeaturesMaxCV) <- gsub("Raw\\.file", "Max Intensity CV", names(AllFeaturesMaxCV))
 write.csv(AllFeaturesMaxCV, "C:/Users/jmcketney.AD/Desktop/FAIMS_MachineLearning/Features_MaxCVs.csv", row.names = F)
 
+###############################################
+####   TO NORMALIZE AMINO ACID COUNTS    ####
+#One long pipeline operator for making new normalized counts#
+normCountsAllFeatures <- normCountsAllFeatures %>% mutate(A.Norm = A.Count / Length.x) %>%
+  mutate(R.Norm = R.Count / Length.x) %>%
+  mutate(N.Norm = N.Count / Length.x) %>%
+  mutate(D.Norm = D.Count / Length.x) %>%
+  mutate(C.Norm = C.Count / Length.x) %>%
+  mutate(Q.Norm = Q.Count / Length.x) %>%
+  mutate(E.Norm = E.Count / Length.x) %>%
+  mutate(G.Norm = G.Count / Length.x) %>%
+  mutate(H.Norm = H.Count / Length.x) %>%
+  mutate(I.Norm = I.Count / Length.x) %>%
+  mutate(L.Norm = L.Count / Length.x) %>%
+  mutate(K.Norm = K.Count / Length.x) %>%
+  mutate(M.Norm = M.Count / Length.x) %>%
+  mutate(F.Norm = F.Count / Length.x) %>%
+  mutate(S.Norm = S.Count / Length.x) %>%
+  mutate(T.Norm = T.Count / Length.x) %>%
+  mutate(W.Norm = W.Count / Length.x) %>%
+  mutate(Y.Norm = Y.Count / Length.x) %>%
+  mutate(V.Norm = V.Count / Length.x) %>%
+  mutate(U.Norm = U.Count / Length.x) %>%
+  mutate(O.Norm = O.Count / Length.x)
+
+write.csv(normCountsAllFeatures, "C:/Users/jmcketney.AD/Desktop/FAIMS_MachineLearning/NormCountsFeatures_MaxCV.csv", row.names = F)
 
 
-#### Looking at the distributions####
+
+
+###############################################
+####    LOOKING AT DISTRIBUTIONS ACROSS RT CHARGE AND PEAK CV    ####
 ##Shows distribution of the peptides by charge and Max Intensity CV
 
 library(RColorBrewer)
@@ -51,12 +175,13 @@ legend("topleft", pch =15, col = brewer.pal(7, "Spectral"), legend = levels(fact
 
 #Make table showing numeric Charge and Peak CV distribution
 CrossComparison <- as.data.frame(table(AllFeaturesMaxCV$Charge, AllFeaturesMaxCV$Peak_CV))
-View(CrossComparison)
 names(CrossComparison) <- c("Charge", "Peak_CV", "Freq")
 
 
-##Function that allows for extraction of peptide intensities for peptide identified in the maximum number of experiments
 
+#Function that takes in charge, CV and dataframe(currently only works with AllFeaturesMaxCV)
+#It finds peptide with the most scan observations across all experiments and
+#pulls out the score metrics and retention time for those scans
 FAIMSPeakBuilder <- function(myCharge, myCV, myFeatureFrame = AllFeaturesMaxCV){
   charge1CV25 <- filter(myFeatureFrame, Charge == myCharge, Peak_CV == myCV)
   charge1CV25 <- merge(charge1CV25, workingEvidence, by = c("Sequence", "Charge"))
@@ -74,25 +199,26 @@ FAIMSPeakBuilder <- function(myCharge, myCV, myFeatureFrame = AllFeaturesMaxCV){
 
 }
 
+
+#Makes a data frame with most point-rich peptides that are charge 2+ and CV from 30-110 by 10
 Charge2by9 <- rbind(FAIMSPeakBuilder(2, 30),FAIMSPeakBuilder(2, 40),FAIMSPeakBuilder(2, 50),
                     FAIMSPeakBuilder(2, 60),FAIMSPeakBuilder(2, 70) ,FAIMSPeakBuilder(2, 80),
                     FAIMSPeakBuilder(2, 90),FAIMSPeakBuilder(2, 100),FAIMSPeakBuilder(2, 110))
-
+#Plot of those peptide/charge combos' intensities across retention time colored by their CV Setting
 ggplot(Charge2by9, aes(Retention.time, LogIntensity, color = Raw.file)) + geom_point() + geom_line() +
   facet_wrap(~Peak_CV, ncol = 3, nrow = 3, scales = "free") + 
   theme(axis.text.x = element_text(angle = 90))
 
 
-#Can do this over the different charge states probably would be helpful to add a smoother
+#Selects different set of peptide/charge combo
 Charge3by4 <- rbind(FAIMSPeakBuilder(3, 40),FAIMSPeakBuilder(3, 60),FAIMSPeakBuilder(3, 80),FAIMSPeakBuilder(3, 100))
-
+#Graps same as above but split into facets by assigned peak CV setting
 ggplot(Charge3by4, aes(Retention.time, LogIntensity, color = Raw.file)) + geom_point() + geom_line() +
   facet_wrap(~Peak_CV, ncol = 2, nrow = 2, scales = "free") + 
   theme(axis.text.x = element_text(angle = 90))
 
 
 ##Produces multicolor points and smoother for each facet
-
 ggplot(Charge2by9, aes(Raw.file, LogIntensity)) + geom_point(color = factor(Charge2by9$Raw.file)) + 
   geom_smooth(method = "loess") + facet_wrap(~Sequence, ncol = 3, nrow = 3, scales = "free") + 
   theme(axis.text.x = element_text(angle = 90))
@@ -108,18 +234,24 @@ ggplot(Charge1ManyCV, aes(Raw.file, LogIntensity, color = Sequence)) + geom_poin
 ggplot(AllFeaturesMaxCV, aes(Peak_CV, colour = Charge)) + geom_histogram(binwidth = 5) + 
   facet_wrap(~Charge, ncol = 2, nrow = 4)
 
+###############################################
+###   ANALYSIS OF ERROR IN INITIAL MODELS    ####
+
 #Reads in, isolates and makes density plots showing the error between the model and 
 FeatureswError <- read.csv("FeaturesMaxCV_withErr.csv")
 AllChargeby9<- FeatureswError[grep("30|40|50|60|70|80|90|110|100", FeatureswError$y2), ]
 
-ggplot(AllChargeby9_2, aes(x=Signd_Model_Error, group = Charge, fill = factor(Charge))) + geom_density(alpha = 0.4) + 
+FeatureswError <- FeatureswError %>% mutate(Signed_Model_Error = y2 - y2_model)
+
+#Generates density plot showing the error distribution colored by charge and split into facets by peak CV
+ggplot(AllChargeby9, aes(x=Signd_Model_Error, group = Charge, fill = factor(Charge))) + geom_density(alpha = 0.4) + 
   facet_wrap(~y2, ncol = 3, nrow = 3) + theme_gray()
 
 
 #Lets make function that takes in the table with error and attaches
 #a vector to it describing number of points across chrom peak
 
-
+#Iterates through Error dataframe and attaches column for number of points at assigned Peak CV setting
 for(i in 1:nrow(FeatureswError)){
   
   FeatureswError$No_Points[i] = nrow(filter(workingEvidence, Sequence == FeatureswError$Sequence[i], 
@@ -127,84 +259,19 @@ for(i in 1:nrow(FeatureswError)){
                                             myCV == FeatureswError$Experiment[i]))
 }
 
+#Iterates through Error dataframe and attaches column for number of points across all experiments
 for(i in 1:nrow(FeatureswError)){
   
   FeatureswError$TotalObs[i] = nrow(filter(workingEvidence, Sequence == FeatureswError$Sequence[i], 
                                             Charge == FeatureswError$Charge[i]))
 }
 
-
+#Split output with error into quartiles based both on signed and absolute error
 FeatureswError <- FeatureswError[order(FeatureswError$model_error), ]
 FeatureswError$Abs_Error_Quartile <- c(rep("Q1", 8243), rep("Q2",8243), rep("Q3",8243), rep("Q4",8242))
 
+FeatureswError <- FeatureswError[order(FeatureswError$Signed_Model_Error), ]
+FeatureswError$Signed_Error_Quartile <- c(rep("Q1", 8243), rep("Q2",8243), rep("Q3",8243), rep("Q4",8242))
+
+
 write.csv(FeatureswError, "AllFeatureswErrorObsNumbers.csv", row.names = F)
-
-
-
-
-> ggplot(BadHigh, aes(factor(Experiment), Intensity, color = Retention.time)) + geom_boxplot() + theme_grey()
-> BadHigh <- BadHigh %>% mutate(LogIntensity = log(Intensity, 2))
-> ggplot(BadHigh, aes(factor(Experiment), LogIntensity)) + geom_boxplot() + theme_grey()
-> GoodHigh <-workingEvidence %>% filter(Sequence == "EHALLAYTLGVK", Charge == 3) %>% select(Sequence, Experiment, Retention.time, Intensity, Charge)
-> GoodHigh <- GoodHigh %>% mutate(LogIntensity = log(Intensity, 2))
-> ggplot(GoodHigh, aes(Experiment, Intensity, color = Retention.time)) + geom_point(alpha = 0.4) + theme_grey()
-> ggplot(GoodHigh, aes(Experiment, Intensity)) + geom_boxplot() + theme_grey()
-> GoodHigh$Experiment <- as.numeric(gsub("^CV_|_2$", "", GoodHigh$Experiment))
-> ggplot(GoodHigh, aes(Experiment, Intensity, color = Retention.time)) + geom_point(alpha = 0.4) + theme_grey()
-> ggplot(GoodHigh, aes(factor(Experiment), LogIntensity)) + geom_boxplot() + theme_grey()
-
-
-
-
-
-
-####To normalize peptide counts####
-
-
-#Read file in 
-AllFeaturesMaxCV <- read.csv("C:/Users/jmcketney.AD/Desktop/FAIMS_MachineLearning/Features_MaxCVs.csv")
-
-
-NormPepCounts <- function(mydataframe, mydatacols){
-  
-  datacols <- mydataframe[, mydatacols]
-  for(i in 1:nrow(datacols)){
-    pepLength <- mydataframe$Length.x[i]
-    for(j in 1:ncol(datacols)){
-      datacols[i,j] <- datacols[i,j] / pepLength
-      
-    }
-  }
-  names(datacols) <- gsub("Count$", "NormCounts", names(datacols))
-  newdataframe <- cbind(mydataframe, datacols)
-  return(newdataframe)
-}
-
-##That took way too long so here we are
-
-normCountsAllFeatures <- AllFeaturesMaxCV
-
-normCountsAllFeatures <- normCountsAllFeatures %>% mutate(A.Norm = A.Count / Length.x)
-normCountsAllFeatures <- normCountsAllFeatures %>% mutate(R.Norm = R.Count / Length.x)
-normCountsAllFeatures <- normCountsAllFeatures %>% mutate(N.Norm = N.Count / Length.x)
-normCountsAllFeatures <- normCountsAllFeatures %>% mutate(D.Norm = D.Count / Length.x)
-normCountsAllFeatures <- normCountsAllFeatures %>% mutate(C.Norm = C.Count / Length.x)
-normCountsAllFeatures <- normCountsAllFeatures %>% mutate(Q.Norm = Q.Count / Length.x)
-normCountsAllFeatures <- normCountsAllFeatures %>% mutate(E.Norm = E.Count / Length.x)
-normCountsAllFeatures <- normCountsAllFeatures %>% mutate(G.Norm = G.Count / Length.x)
-normCountsAllFeatures <- normCountsAllFeatures %>% mutate(H.Norm = H.Count / Length.x)
-normCountsAllFeatures <- normCountsAllFeatures %>% mutate(I.Norm = I.Count / Length.x)
-normCountsAllFeatures <- normCountsAllFeatures %>% mutate(L.Norm = L.Count / Length.x)
-normCountsAllFeatures <- normCountsAllFeatures %>% mutate(K.Norm = K.Count / Length.x)
-normCountsAllFeatures <- normCountsAllFeatures %>% mutate(M.Norm = M.Count / Length.x)
-normCountsAllFeatures <- normCountsAllFeatures %>% mutate(F.Norm = F.Count / Length.x)
-normCountsAllFeatures <- normCountsAllFeatures %>% mutate(S.Norm = S.Count / Length.x)
-normCountsAllFeatures <- normCountsAllFeatures %>% mutate(T.Norm = T.Count / Length.x)
-normCountsAllFeatures <- normCountsAllFeatures %>% mutate(W.Norm = W.Count / Length.x)
-normCountsAllFeatures <- normCountsAllFeatures %>% mutate(Y.Norm = Y.Count / Length.x)
-normCountsAllFeatures <- normCountsAllFeatures %>% mutate(V.Norm = V.Count / Length.x)
-normCountsAllFeatures <- normCountsAllFeatures %>% mutate(U.Norm = U.Count / Length.x)
-normCountsAllFeatures <- normCountsAllFeatures %>% mutate(O.Norm = O.Count / Length.x)
-
-write.csv(normCountsAllFeatures, "C:/Users/jmcketney.AD/Desktop/FAIMS_MachineLearning/NormCountsFeatures_MaxCV.csv", row.names = F)
-
