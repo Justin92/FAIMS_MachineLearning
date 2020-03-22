@@ -1,9 +1,126 @@
 
-##Code used to thin out the evidence file and find max CVs
-##Could be made more efficient possibly by using the peptides file
+###Import necessary libraries####
 library(dplyr)
 library(tidyr)
+library(cowplot)
+library(stringr)
 
+
+#########
+##################         NEW      STRATEGY    FOR     PREPROCESSING      JGM(Fragpipe & Skyline)  DATA      ###################
+
+
+#Make binary all values for CV settings
+
+#Define binarizing function, applies 0.5 default
+binarizer <- function(x, threshold = 0.5){
+  
+  if(x >= threshold){
+    x <- 1
+  }
+  else{
+    x <- 0
+  }
+}
+
+####Reading in old dataset#####
+#CleanReport <- read.delim("D:/Projects/FAIMS_MachineLearning/2020/January/InitialDataProcessingFromJesse/JMMdata_maxCVvalues.txt", stringsAsFactors = F)
+#####GENERATE CLEAN DATASET WITH BINARY LABELS AND FEATURES####
+
+#Read scaled intensity from CSV
+CleanReport <- read.delim("P:/JGM_FAIMS_CVprediction/JMM_new_data/NEW_JMMdata_maxCVvalues.txt")
+
+#Replace some column names to allow for use of some old code
+colnames(CleanReport) <- gsub("z_modseq", "SeqCharge", colnames(CleanReport))
+
+#removing acetylation notation from the modified sequences and replace with 'a' in modified sequence
+CleanReport$SeqCharge <- gsub("\\[\\+42\\]", "a", CleanReport$SeqCharge)
+
+#Parse out features such as Charge, Modified Sequence, and True Sequence, Length
+CleanReport <- CleanReport %>% mutate(Charge = str_extract(SeqCharge, "[0-9]")) %>% 
+  mutate(ModSequence = str_extract(SeqCharge, "[aA-zZ]+")) %>% mutate(Length = nchar(ModSequence))
+
+#Make substitute canonical amino acids with modified amino acids
+CleanReport$Sequence <- gsub("a|m", "M", CleanReport$ModSequence)
+
+
+##Need to generate threshold table for cutoffs##
+Rawjgmdata <- read.csv("D:/Projects/FAIMS_MachineLearning/2020/January/InitialDataProcessingFromJesse/Peptide_area_q_idotp.csv", 
+                       stringsAsFactors = F)
+CVindex <- grep("Total\\.Area", colnames(Rawjgmdata))
+cvsetting <- c()
+medianArea <- c()
+
+for(CVindex in grep("Total\\.Area", colnames(Rawjgmdata))){
+  
+  cvsetting <- c(cvsetting, gsub("\\.Total\\.Area$", "", colnames(Rawjgmdata[CVindex])))
+  medianArea <- c(medianArea, median(as.numeric(Rawjgmdata[Rawjgmdata[,CVindex] > 0, CVindex]), na.rm = T))
+  
+  
+}
+
+medianArea_df <- as.data.frame(cbind(cvsetting, medianArea)) %>% 
+  mutate(medianArea = as.numeric(as.character(medianArea)), cvsetting = as.character(cvsetting)) %>%
+  group_by(cvsetting) %>% mutate(Threshold = (mean(medianArea) - min(medianArea))/ (max(medianArea) - min(medianArea))) #%>% 
+
+
+###Three options for the cutoff###
+
+## 1)   Original, just cuts off at 50%####
+##CleanReport[1:nrow(CleanReport),2:max(grep("X[0-9]+", colnames(CleanReport)))] <- 
+##  as.data.frame(apply(CleanReport[1:nrow(CleanReport),2:max(grep("X[0-9]+", colnames(CleanReport)))], c(1,2), binarizer))
+
+##Numbers of each label
+## X20   X25   X30   X35   X40   X45   X50   X55   X60   X65   X70   X75   X80   X85   X90   X95 
+## 778  5374 15498 25470 35397 37203 35591 31146 26324 15904 17986 11517  7343  4350  2475  1231
+
+###################
+## 2)Cutoff based on median intensity for that CV setting proportional to the max and min median intensity (BEST)####
+for(i in grep("X[0-9]+", colnames(CleanReport))){
+  CleanReport[1:nrow(CleanReport), i] <- as.data.frame(apply(CleanReport[1:nrow(CleanReport),i, drop = F], c(1,2), binarizer, threshold = medianArea_df$Threshold[grep(colnames(CleanReport[i]), medianArea_df$cvsetting)]))
+}
+##Numbers of each label
+## X20   X25   X30   X35   X40   X45   X50   X55   X60   X65   X70   X75   X80   X85   X90   X95 
+## 5489 13296 24087 29467 26872 19748 25219 28509 28265 24214 21750 16993 12243  8360  5265  3134 
+###################
+## 3) Cutoff based on the order of the median intensity similar to Spearman####
+##Third try with dynamic threshold that is proportional to rank
+
+##for(i in grep("X[0-9]+", colnames(CleanReport))){
+##  CleanReport[1:nrow(CleanReport), i] <- as.data.frame(apply(CleanReport[1:nrow(CleanReport),i, drop = F], c(1,2), binarizer, threshold = medianArea_df$BlockThreshold[grep(colnames(CleanReport[i]), medianArea_df$cvsetting)]))
+##}
+##Numbers of each label
+##X20   X25   X30   X35   X40   X45   X50   X55   X60   X65   X70   X75   X80   X85   X90   X95 
+##2077  7102 15911 21852 26033 20398 23241 24369 21996 12523 17698 12586  8566  5787  3655  2061
+
+
+###################
+###Saving Clean Data#####
+
+#1
+#write.csv(CleanReport, "D:/Projects/FAIMS_MachineLearning/2020/January/InitialDataProcessingFromJesse/NewJGMDataWFeatures.csv", row.names = F)
+#2
+write.csv(CleanReport, "D:/Projects/FAIMS_MachineLearning/2020/March/DynamicThresholdSecondJGMDataset.csv", row.names = F)
+#3
+#write.csv(CleanReport, "D:/Projects/FAIMS_MachineLearning/2020/March/SpearmanThresholdSecondJGMDataset.csv", row.names = F)
+
+###################
+
+
+
+
+
+
+
+##################          OLD(03/20/19 Pre Multilabel)      STRATEGY    FOR     PREPROCESSING      MAXQUANT  DATA      ###################
+
+
+
+
+
+
+##Code used to thin out the evidence file and find max CVs
+##Could be made more efficient possibly by using the peptides file
 ####Preprocessing just to pull out info we want####
 
 ##Read in necessary files
