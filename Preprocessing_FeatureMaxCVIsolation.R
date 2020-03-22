@@ -47,7 +47,7 @@ CleanReport$Sequence <- gsub("a|m", "M", CleanReport$ModSequence)
 ##Need to generate threshold table for cutoffs##
 Rawjgmdata <- read.csv("D:/Projects/FAIMS_MachineLearning/2020/January/InitialDataProcessingFromJesse/Peptide_area_q_idotp.csv", 
                        stringsAsFactors = F)
-CVindex <- grep("Total\\.Area", colnames(Rawjgmdata))
+
 cvsetting <- c()
 medianArea <- c()
 
