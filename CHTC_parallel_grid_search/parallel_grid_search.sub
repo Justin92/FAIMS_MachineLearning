@@ -1,0 +1,21 @@
+#The below file will run a single job targeting a machine with 16 cores andat least
+#127 GB RAM, with the shared Gluster file system, and will guarantee 72 hours of runtime.
+job = FAIMS_RFR
+universe = vanilla
+log = log_files/$(job)_$(Cluster).log
+executable = /home/ijmiller2/FAIMS/parallel_grid_search.sh
+#This pulls argument from last line
+arguments = $(param_index)
+output = out_files/$(job)_$(Cluster)_$(Process).out
+error = err_files/$(job)_$(Cluster)_$(Process).err
+should_transfer_files = YES
+when_to_transfer_output = ON_EXIT
+transfer_input_files = /home/ijmiller2/FAIMS/parallel_grid_search.tar.gz
+#transfer_output_files =
+request_cpus = 1
+request_memory = 4GB
+request_disk = 3GB
+requirements = (OpSysMajorVer == 7)
+#notification = Always
+#notify_user = k09im01@gmail.com
+queue param_index from /home/ijmiller2/FAIMS/param_indices.list
