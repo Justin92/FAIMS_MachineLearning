@@ -38,11 +38,11 @@ from fastai import accuracy_thresh
 #####READING IN DATA, ESTABLISHING X AND Y#########
 #Read in data that already has all the pyteomics features added
 #and potentially one-hot
-data_df = pd.read_csv("FinalThreshold.csv", low_memory=False)
+data_df = pd.read_csv("50percentplusTraining.csv", low_memory=False) #P:\JGM_FAIMS_CVprediction\JMM_PreProcessed_Data\50percentplusTraining.csv
 
 #Ideally input data structured with labels, followed by named features, followed
 #by one-hots
-onehotstart = #40  not sure what this is right now
+onehotstart = 22
 
 #Make X from concatenating named features to one-hots
 feature_subset = ['Charge', 'Length', 'pyMass', 'pI']
