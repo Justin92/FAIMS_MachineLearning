@@ -92,7 +92,7 @@ RFC_recall = []
 RFC_rocauc = []
 RFC_threshacc = []
 
-k_fold = IterativeStratification(n_splits=5, order=3)#, random_state=123)
+k_fold = IterativeStratification(n_splits=5, order=3)#, random_state=23)
 for train, test in k_fold.split(X, y):
 
         #Train the multiforest using the training indices
