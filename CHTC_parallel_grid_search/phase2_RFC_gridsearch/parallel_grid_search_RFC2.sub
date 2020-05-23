@@ -1,21 +1,22 @@
 #The below file will run a single job targeting a machine with 16 cores andat least
 #127 GB RAM, with the shared Gluster file system, and will guarantee 72 hours of runtime.
-job = FAIMS_RFR
+job = FAIMS_RFC2
 universe = vanilla
 log = log_files/$(job)_$(Cluster).log
-executable = /home/ijmiller2/FAIMS/parallel_grid_search.sh
+#Telling the file where to find the executable sh file
+executable = /home/mcketney/CHTC_multilabel_grid_search/parallel_grid_search_RFC2.sh
 #This pulls argument from last line
 arguments = $(param_index)
 output = out_files/$(job)_$(Cluster)_$(Process).out
 error = err_files/$(job)_$(Cluster)_$(Process).err
 should_transfer_files = YES
 when_to_transfer_output = ON_EXIT
-transfer_input_files = /home/ijmiller2/FAIMS/parallel_grid_search.tar.gz
+transfer_input_files = /home/mcketney/CHTC_multilabel_grid_search/parallel_grid_search_RFC2.tar.gz
 #transfer_output_files =
 request_cpus = 1
-request_memory = 4GB
+request_memory = 16GB
 request_disk = 3GB
-requirements = (OpSysMajorVer == 7)
+requirements = (OpSysMajorVer == 7)  && (has_avx == true)
 #notification = Always
 #notify_user = k09im01@gmail.com
-queue param_index from /home/ijmiller2/FAIMS/param_indices.list
+queue param_index from /home/mcketney/CHTC_multilabel_grid_search/RFC_params_indices2
