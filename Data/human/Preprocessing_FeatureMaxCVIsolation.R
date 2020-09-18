@@ -15,7 +15,7 @@ library(ggplot2)
 #Define binarizing function, applies 0.5 default
 binarizer <- function(x, threshold = 0.5){
   
-  if(x >= threshold){
+  if(x > threshold){
     x <- 1
   }
   else{
@@ -36,13 +36,12 @@ CleanReport$SeqCharge <- gsub("\\[\\+42\\]", "a", CleanReport$SeqCharge)
 CleanReport <- CleanReport %>% mutate(Charge = str_extract(SeqCharge, "[0-9]")) %>% 
   mutate(ModSequence = str_extract(SeqCharge, "[aA-zZ]+")) %>% mutate(Length = nchar(ModSequence))
 
-#Make substitute canonical amino acids with modified amino acids
+#Substitute canonical amino acids with modified amino acids
 CleanReport$Sequence <- gsub("a|m", "M", CleanReport$ModSequence)
 
 CleanReportPerm <- CleanReport
 
-###Exploratory Analysis to decide what we want the algorithm to predict
-
+#Calculate the proportional intensity distribution for each CVmax
 IntensityDist <- c()
 #For each CV setting
 for(cv in unique(CleanReportPerm$maxcv_naomit)){
@@ -79,10 +78,8 @@ for(cv in Threshold50table$MaxCV){
 }
 
 
-#So now need to do this by row instead of column
-
+#Converting proportional intensities to binary labels by row based on CVmax
 CleanReport <- CleanReportPerm
-
 for(cv in unique(CleanReport$maxcv_naomit)){
   
   cv_rows <- grep(cv, CleanReport$maxcv_naomit)
